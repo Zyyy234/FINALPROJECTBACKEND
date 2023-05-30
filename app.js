@@ -19,7 +19,7 @@ require("./userDetails")
 const User=mongoose.model("UserInfo");
 
 app.post("/register",async(req,res)=>{
-    const {fname,lname,email,password} = req.body;
+    const {fname,lname,position,gender,address,contactNumber,email,password,userType} = req.body;
 
     const encryptedPassword=await bcrypt.hash(password,10);
     try{
@@ -32,8 +32,13 @@ app.post("/register",async(req,res)=>{
         await User.create({
             fname,
             lname,
+            position,
+            gender,
+            address,
+            contactNumber,
             email,
             password:encryptedPassword,
+            userType
         });
         res.send({ status:"ok"})
 
@@ -50,7 +55,9 @@ app.post("/login-user", async(req,res)=>{
         return res.json({error:"User not found"});
     }
     if (await bcrypt.compare(password,user.password)){
-        const token = jwt.sign({email:user.email}, jwt_secret);
+        const token = jwt.sign({email:user.email}, jwt_secret, {
+            expiresIn: "15m",
+        });
         
         if(res.status(201)){
             return res.json({status:"ok", data: token});
@@ -64,8 +71,17 @@ app.post("/login-user", async(req,res)=>{
 app.post("/userData", async (req,res)=>{
     const {token} = req.body;
     try{
-        const user = jwt.verify(token,jwt_secret);
+        const user = jwt.verify(token,jwt_secret, (err,res)=>{
+            if(err){
+                return "token expired";
+            }
+                return res;    
+        });
         console.log(user);
+        if(user == "token expired"){
+            return res.send({status:"error",data:"token expired"}); 
+        }
+
         const userEmail = user.email;
         User.findOne({email:userEmail}).then ((data)=>{
            res.send({status:"ok",data:data});    
@@ -94,3 +110,25 @@ app.post("/post", async (req,res) => {
         res.send({ status: "Something went wrong try again"});
     }
 });
+
+app.get("/getAllUser", async (req, res) => {
+    try {
+      const allUsers = await User.find({}).exec(); // Execute the query using .exec()
+  
+      res.send({ status: "ok", data: allUsers }); // Send the actual data in the response
+    } catch (error) {
+      console.log(error);
+      res.send({ status: "error", data: error });
+    }
+  });
+  
+  app.post("/deleteUser", async (req, res) => {
+    try {
+      const { userid } = req.body;
+      await User.deleteOne({ _id: userid });
+      res.send({ status: "ok", data: "deleted" });
+    } catch (error) {
+      console.log(error);
+      res.send({ status: "error", data: error });
+    }
+  });
